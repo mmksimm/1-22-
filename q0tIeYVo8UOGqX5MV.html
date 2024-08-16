@@ -1,0 +1,630 @@
+<html><head><base href="https://example.com%D0%BC%D0%B5%D0%B6%D0%B4%D1%83%20%D0%B3%D0%B5%D0%BD%D0%B5%D1%80%D0%B0%D1%86%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%BF%D1%80%D0%BE%D0%B8%D1%81%D1%85%D0%BE%D0%B4%D0%B8%D1%82%20%D0%B7%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B0%201%20%D1%81%D0%B5%D0%BA">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pixel Gangster NFT Generator</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+  
+  :root {
+    --tg-theme-bg-color: #ffffff;
+    --tg-theme-text-color: #000000;
+    --tg-theme-hint-color: #999999;
+    --tg-theme-link-color: #2481cc;
+    --tg-theme-button-color: #5288c1;
+    --tg-theme-button-text-color: #ffffff;
+  }
+
+  body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    margin: 0;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  h1 {
+    font-size: 24px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  #canvasContainer {
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 1;
+    border: 2px solid var(--tg-theme-button-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+
+  #backgroundCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+
+  #mainCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+  }
+
+  button {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    border: none;
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    width: 100%;
+    max-width: 300px;
+    transition: opacity 0.3s;
+  }
+
+  button:active {
+    opacity: 0.8;
+  }
+
+  #nftInfo, #traits {
+    width: 100%;
+    max-width: 300px;
+    margin-top: 16px;
+    font-size: 14px;
+  }
+
+  .rarity {
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .trait {
+    background-color: rgba(82, 136, 193, 0.1);
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+
+  #rarityMeter {
+    width: 100%;
+    max-width: 300px;
+    height: 8px;
+    background-color: var(--tg-theme-hint-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+
+  #rarityFill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--tg-theme-button-color);
+    transition: width 0.5s ease-in-out;
+  }
+
+  #remainingCount {
+    margin-top: 16px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  #loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .loader {
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid var(--tg-theme-button-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+  <h1>Pixel Gangster NFT</h1>
+  <div id="canvasContainer">
+    <canvas id="backgroundCanvas" width="128" height="128"></canvas>
+    <canvas id="mainCanvas" width="128" height="128"></canvas>
+  </div>
+  <button onclick="generateGangster()">Generate New Gangster</button>
+  <div id="nftInfo"></div>
+  <div id="traits"></div>
+  <div id="rarityMeter">
+    <div id="rarityFill"></div>
+  </div>
+  <div id="remainingCount"></div>
+
+  <div id="loadingOverlay" style="display: none;">
+    <div class="loader"></div>
+  </div>
+
+  <script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.MainButton.setParams({
+      text: 'SHARE NFT',
+      color: tg.themeParams.button_color,
+      text_color: tg.themeParams.button_text_color,
+    });
+
+    const mainCanvas = document.getElementById('mainCanvas');
+    const ctx = mainCanvas.getContext('2d');
+    const backgroundCanvas = document.getElementById('backgroundCanvas');
+    const bgCtx = backgroundCanvas.getContext('2d');
+    const pixelSize = 4;
+    const canvasSize = 32;
+    mainCanvas.width = canvasSize * pixelSize;
+    mainCanvas.height = canvasSize * pixelSize;
+    backgroundCanvas.width = canvasSize * pixelSize;
+    backgroundCanvas.height = canvasSize * pixelSize;
+    ctx.imageSmoothingEnabled = false;
+    bgCtx.imageSmoothingEnabled = false;
+
+    let remainingGangsters = 5000;
+    let isGenerating = false;
+    let currentAnimation;
+    let currentBackgroundAnimation;
+    let currentNFTNumber = 0;
+
+    const colors = {
+      skin: ['#FBE4C0', '#F4C49C', '#DBA67C', '#A66E4A', '#6B4423', '#3D2314'],
+      hair: ['#000000', '#693A1C', '#C4A55F', '#503335', '#D4D4D4', '#8C4E37', '#FF0000', '#00FF00', '#0000FF'],
+      suit: ['#2C2C2C', '#424242', '#3B3B3B', '#1C1C1C', '#0F0F0F', '#6B0F0F', '#0F0F6B', '#6B6B0F'],
+      tie: ['#FF0000', '#0000FF', '#FFFF00', '#00FF00', '#FF00FF', '#00FFFF', '#FFFFFF', '#000000'],
+      background: ['#87CEEB', '#FF6B6B', '#4CAF50', '#9C27B0', '#FFA500', '#1E90FF', '#FF1493', '#00CED1']
+    };
+
+    const attributes = [
+      'hasHat',
+      'hasSunglasses',
+      'hasCigar',
+      'hasBeard',
+      'hasScar',
+      'hasEarrings',
+      'hasNecklace',
+      'hasTattoo',
+      'hasPocketSquare',
+      'hasWatch',
+      'hasGoldTooth',
+      'hasFacialPiercing',
+      'hasFingerlessGloves'
+    ];
+
+    const specialBackgrounds = ['Matrix', 'LSD', 'Shining', 'Stars', 'Gold'];
+
+    const firstNames = ['Tony', 'Vito', 'Sonny', 'Lucky', 'Bugsy', 'Frankie', 'Johnny', 'Jimmy', 'Paulie', 'Vinnie'];
+    const lastNames = ['Soprano', 'Corleone', 'Luciano', 'Siegel', 'Gambino', 'Genovese', 'Capone', 'Dillinger', 'Lansky', 'Costello'];
+
+    function randomChoice(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function setPixel(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+    }
+
+    function generateUniqueName() {
+      return `${randomChoice(firstNames)} ${randomChoice(lastNames)}`;
+    }
+
+    async function generateGangster() {
+      if (isGenerating) return;
+      if (remainingGangsters <= 0) {
+        alert("All gangsters have been generated!");
+        return;
+      }
+
+      isGenerating = true;
+      showLoadingOverlay();
+
+      ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+      bgCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+
+      if (currentAnimation) {
+        clearInterval(currentAnimation);
+      }
+      if (currentBackgroundAnimation) {
+        clearInterval(currentBackgroundAnimation);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      currentNFTNumber++;
+      const gangsterName = generateUniqueName();
+
+      const gangster = {
+        name: gangsterName,
+        number: currentNFTNumber,
+        skinColor: randomChoice(colors.skin),
+        hairColor: randomChoice(colors.hair),
+        suitColor: randomChoice(colors.suit),
+        tieColor: randomChoice(colors.tie),
+        bgColor: randomChoice(colors.background)
+      };
+
+      let selectedAttributes = [];
+      const rarityRoll = Math.random() * 100;
+      let targetAttributeCount;
+
+      if (rarityRoll < 35) {
+        targetAttributeCount = Math.floor(Math.random() * 6);
+      } else if (rarityRoll < 60) {
+        targetAttributeCount = 6 + Math.floor(Math.random() * 3);
+      } else if (rarityRoll < 80) {
+        targetAttributeCount = 9 + Math.floor(Math.random() * 2);
+      } else if (rarityRoll < 90) {
+        targetAttributeCount = 11 + Math.floor(Math.random() * 2);
+      } else if (rarityRoll < 97) {
+        targetAttributeCount = 13;
+      } else {
+        targetAttributeCount = attributes.length;
+      }
+
+      while (selectedAttributes.length < targetAttributeCount) {
+        const attr = randomChoice(attributes);
+        if (!selectedAttributes.includes(attr)) {
+          gangster[attr] = true;
+          selectedAttributes.push(attr);
+        }
+      }
+
+      const rarityLevel = getRarityLevel(selectedAttributes.length);
+
+      let backgroundType = 'Static';
+      if (rarityLevel === 'Legendary' || rarityLevel === 'Mythic') {
+        backgroundType = randomChoice(specialBackgrounds);
+        currentBackgroundAnimation = drawSpecialBackground(backgroundType);
+      } else {
+        bgCtx.fillStyle = gangster.bgColor;
+        bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+      }
+
+      drawGangster(gangster);
+
+      const traits = [
+        `Name: ${gangster.name}`,
+        `Skin: ${gangster.skinColor}`,
+        `Hair: ${gangster.hairColor}`,
+        `Suit: ${gangster.suitColor}`,
+        `Tie: ${gangster.tieColor}`,
+        `Background: ${backgroundType}`,
+        ...selectedAttributes.map(attr => attr.replace('has', '').replace(/([A-Z])/g, ' $1').trim())
+      ];
+
+      document.getElementById('nftInfo').innerHTML = `
+        <div class="rarity">${rarityLevel} Gangster #${gangster.number}</div>
+        <div class="trait">Name: ${gangster.name}</div>
+      `;
+
+      document.getElementById('traits').innerHTML = traits.slice(1).map(trait => `<div class="trait">${trait}</div>`).join('');
+
+      const rarityPercentage = (selectedAttributes.length / attributes.length) * 100;
+      document.getElementById('rarityFill').style.width = `${rarityPercentage}%`;
+
+      remainingGangsters--;
+      document.getElementById('remainingCount').textContent = `Remaining Gangsters: ${remainingGangsters}`;
+
+      if (rarityLevel === 'Epic' || rarityLevel === 'Legendary' || rarityLevel === 'Mythic') {
+        currentAnimation = animateGangster(gangster);
+      }
+
+      tg.MainButton.show();
+      hideLoadingOverlay();
+      isGenerating = false;
+    }
+
+    function drawGangster(gangster) {
+      // Head
+      for (let y = 8; y < 16; y++) {
+        for (let x = 10; x < 22; x++) {
+          setPixel(x, y, gangster.skinColor);
+        }
+      }
+
+      // Suit
+      for (let y = 16; y < 32; y++) {
+        for (let x = 8; x < 24; x++) {
+          setPixel(x, y, gangster.suitColor);
+        }
+      }
+
+      // Tie
+      for (let y = 18; y < 26; y++) {
+        setPixel(15, y, gangster.tieColor);
+        setPixel(16, y, gangster.tieColor);
+      }
+
+      // Hair
+      for (let y = 6; y < 10; y++) {
+        for (let x = 10; x < 22; x++) {
+          setPixel(x, y, gangster.hairColor);
+        }
+      }
+
+      // Eyes
+      setPixel(13, 11, '#FFFFFF');
+      setPixel(18, 11, '#FFFFFF');
+
+      // Additional attributes
+      if (gangster.hasHat) {
+        for (let y = 4; y < 8; y++) {
+          for (let x = 9; x < 23; x++) {
+            setPixel(x, y, '#8B4513');
+          }
+        }
+      }
+
+      if (gangster.hasSunglasses) {
+        for (let x = 11; x < 21; x++) {
+          setPixel(x, 11, '#000000');
+        }
+      }
+
+      if (gangster.hasCigar) {
+        setPixel(21, 14, '#8B4513');
+        setPixel(22, 14, '#A0522D');
+        setPixel(23, 14, '#CD853F');
+      }
+
+      if (gangster.hasBeard) {
+        for (let y = 14; y < 16; y++) {
+          for (let x = 11; x < 21; x++) {
+            setPixel(x, y, gangster.hairColor);
+          }
+        }
+      }
+
+      if (gangster.hasScar) {
+        setPixel(12, 10, '#FF0000');
+        setPixel(13, 10, '#FF0000');
+      }
+
+      if (gangster.hasEarrings) {
+        setPixel(9, 12, '#FFD700');
+        setPixel(22, 12, '#FFD700');
+      }
+
+      if (gangster.hasNecklace) {
+        for (let x = 13; x < 19; x++) {
+          setPixel(x, 16, '#FFD700');
+        }
+      }
+
+      if (gangster.hasTattoo) {
+        setPixel(8, 18, '#0000FF');
+        setPixel(8, 19, '#0000FF');
+        setPixel(9, 18, '#0000FF');
+      }
+
+      if (gangster.hasPocketSquare) {
+        setPixel(20, 17, '#FFFFFF');
+        setPixel(21, 17, '#FFFFFF');
+        setPixel(20, 18, '#FFFFFF');
+      }
+
+      if (gangster.hasWatch) {
+        setPixel(7, 24, '#FFD700');
+        setPixel(7, 25, '#FFD700');
+      }
+
+      if (gangster.hasGoldTooth) {
+        setPixel(16, 14, '#FFD700');
+      }
+
+      if (gangster.hasFacialPiercing) {
+        setPixel(15, 15, '#C0C0C0');
+      }
+
+      if (gangster.hasFingerlessGloves) {
+        for (let y = 26; y < 30; y++) {
+          setPixel(7, y, '#000000');
+          setPixel(24, y, '#000000');
+        }
+      }
+    }
+
+    function getRarityLevel(attributeCount) {
+      if (attributeCount <= 5) return 'Common';
+      if (attributeCount <= 8) return 'Uncommon';
+      if (attributeCount <= 10) return 'Rare';
+      if (attributeCount <= 12) return 'Epic';
+      if (attributeCount === 13) return 'Legendary';
+      return 'Mythic';
+    }
+
+    function animateGangster(gangster) {
+      let frame = 0;
+      return setInterval(() => {
+        ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        drawGangster(gangster);
+        
+        // Simple animation: move the gangster up and down
+        const offset = Math.sin(frame * 0.1) * 2;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(mainCanvas, 0, offset);
+        
+        frame++;
+      }, 50);
+    }
+
+    function drawSpecialBackground(type) {
+      switch (type) {
+        case 'Matrix':
+          return drawMatrixBackground();
+        case 'LSD':
+          return drawLSDBackground();
+        case 'Shining':
+          return drawShiningBackground();
+        case 'Stars':
+          return drawStarsBackground();
+        case 'Gold':
+          return drawGoldBackground();
+      }
+    }
+
+    function drawMatrixBackground() {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+";
+      const columns = backgroundCanvas.width / pixelSize;
+      const drops = [];
+
+      for (let i = 0; i < columns; i++) {
+        drops[i] = 1;
+      }
+
+      return setInterval(() => {
+        bgCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+
+        bgCtx.fillStyle = '#0F0';
+        bgCtx.font = `${pixelSize}px monospace`;
+
+        for (let i = 0; i < drops.length; i++) {
+          const text = chars[Math.floor(Math.random() * chars.length)];
+          bgCtx.fillText(text, i * pixelSize, drops[i] * pixelSize);
+
+          if (drops[i] * pixelSize > backgroundCanvas.height && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+
+          drops[i]++;
+        }
+      }, 50);
+    }
+
+    function drawLSDBackground() {
+      let hue = 0;
+      return setInterval(() => {
+        for (let y = 0; y < backgroundCanvas.height; y += pixelSize) {
+          for (let x = 0; x < backgroundCanvas.width; x += pixelSize) {
+            const h = (hue + x / 5 + y / 5) % 360;
+            bgCtx.fillStyle = `hsl(${h}, 100%, 50%)`;
+            bgCtx.fillRect(x, y, pixelSize, pixelSize);
+          }
+        }
+        hue = (hue + 1) % 360;
+      }, 50);
+    }
+
+    function drawShiningBackground() {
+      let phase = 0;
+      return setInterval(() => {
+        bgCtx.fillStyle = '#000000';
+        bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+        for (let i = 0; i < 10; i++) {
+          const x = Math.random() * backgroundCanvas.width;
+          const y = Math.random() * backgroundCanvas.height;
+          const radius = Math.random() * 20 + 10;
+          const gradient = bgCtx.createRadialGradient(x, y, 0, x, y, radius);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+          gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          bgCtx.fillStyle = gradient;
+          bgCtx.beginPath();
+          bgCtx.arc(x, y, radius, 0, Math.PI * 2);
+          bgCtx.fill();
+        }
+        phase += 0.1;
+      }, 100);
+    }
+
+    function drawStarsBackground() {
+      const stars = [];
+      for (let i = 0; i < 100; i++) {
+        stars.push({
+          x: Math.random() * backgroundCanvas.width,
+          y: Math.random() * backgroundCanvas.height,
+          size: Math.random() * 2 + 1,
+          speed: Math.random() * 0.5 + 0.1
+        });
+      }
+      return setInterval(() => {
+        bgCtx.fillStyle = '#000033';
+        bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+        stars.forEach(star => {
+          bgCtx.fillStyle = 'white';
+          bgCtx.fillRect(star.x, star.y, star.size, star.size);
+          star.y += star.speed;
+          if (star.y > backgroundCanvas.height) {
+            star.y = 0;
+            star.x = Math.random() * backgroundCanvas.width;
+          }
+        });
+      }, 50);
+    }
+
+    function drawGoldBackground() {
+      let phase = 0;
+      return setInterval(() => {
+        for (let y = 0; y < backgroundCanvas.height; y += pixelSize) {
+          for (let x = 0; x < backgroundCanvas.width; x += pixelSize) {
+            const distance = Math.sqrt((x - backgroundCanvas.width / 2) ** 2 + (y - backgroundCanvas.height / 2) ** 2);
+            const brightness = Math.sin(distance / 10 + phase) * 20 + 60;
+            bgCtx.fillStyle = `rgb(${brightness + 155}, ${brightness + 127}, 0)`;
+            bgCtx.fillRect(x, y, pixelSize, pixelSize);
+          }
+        }
+        phase += 0.1;
+      }, 50);
+    }
+
+    function showLoadingOverlay() {
+      document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+
+    function hideLoadingOverlay() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    tg.MainButton.onClick(() => {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = mainCanvas.width;
+      tempCanvas.height = mainCanvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      tempCtx.drawImage(backgroundCanvas, 0, 0);
+      tempCtx.drawImage(mainCanvas, 0, 0);
+
+      tempCanvas.toBlob((blob) => {
+        tg.sendData(blob);
+      });
+    });
+
+    generateGangster();
+  </script>
+</body>
+</html>
